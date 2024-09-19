@@ -29,7 +29,6 @@ Within the OpenBB Platform, the extension acts as Global with methods to add, re
 
 When used as standalone, the `user_data_directory` property (preference) should be set to the desired read/write directory
 upon initialization. Alternatively, specify the complete path to the file when using the IO methods' `filename` parameter.
-```
 
 ## Usage
 
