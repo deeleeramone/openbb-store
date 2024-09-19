@@ -1,6 +1,6 @@
 # OBBject Store Extension
 
-`openbb-store` is an OBBject extension for storing and retrieving OBBjects, Data, DataFrames, ExcelFiles, dictionaries, lists, and strings.
+`openbb-store` is an [OBBject](https://docs.openbb.co/platform/developer_guide/obbject) extension for storing and retrieving OBBjects, Data, DataFrames, ExcelFiles, dictionaries, lists, and strings.
 
 Each entry is stored as a compressed pickle, with SHA1 signature, using the LZMA module with the "xz" algorithm set to maximum compression.
 
@@ -63,7 +63,7 @@ The contents of any object being added must be serializable.
 ### Add Data
 
 ```python
-from openbb import obb
+from openbb import obb  # If `openbb` is not installed, install it with `pip install openbb`
 
 data = obb.equity.price.historical("NVDA", provider="yfinance", start_date="2023-01-01", end_date="2023-12-31")
 data.store.add_store(data=data, name="nvda2023")
