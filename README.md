@@ -17,7 +17,7 @@ Install from PyPI with:
 pip install openbb-store
 ```
 
-Then, rebuild the OpenBB Python interface:
+Then, if the main `openbb` package is installed, rebuild the OpenBB Python interface:
 
 ```console
 python -c "import openbb;openbb.build()"
