@@ -4,12 +4,12 @@
 
 Each entry is stored as a compressed pickle, with SHA1 signature, using the LZMA module with the "xz" algorithm set to maximum compression.
 
-The purpose of this module is to persist binary objects in-memory, and/or to-disk, in a format that is transportable over a network.
-An example use-case is a server-side cache for redistributing common data resources among various API endpoints and callbacks.
-
-Another use-case is to persist frequently-accessed items like, lists and maps of ticker symbols or, static assets in a format suitable for programmatic utility.
+The purpose of this module is to efficiently persist binary objects in-memory, and/or to-disk, in a format that is transportable over a network.
+An example use-case is a server-side cache for redistributing common data resources among various API endpoints and callbacks. Another is to persist frequently-accessed items like, lists and maps of ticker symbols or, static assets in a format suitable for programmatic utility.
 
 ## Installation
+
+### PyPI
 
 Install from PyPI with:
 
@@ -17,26 +17,21 @@ Install from PyPI with:
 pip install openbb-store
 ```
 
-Then, if the main `openbb` package is installed, rebuild the OpenBB Python interface:
+### From Source
 
-```console
-python -c "import openbb;openbb.build()"
+After cloning the repo, navigate into the project's folder, create a new Python environment, then install with:
+
+```sh
+pip install -e .
 ```
-
-## Store Class
-
-Within the OpenBB Platform, the extension acts as Global with methods to add, retrieve, and save groups of data objects to memory or file in a transportable and compressed format.
-
-When used as standalone, the `user_data_directory` property (preference) should be set to the desired read/write directory
-upon initialization. Alternatively, specify the complete path to the file when using the IO methods' `filename` parameter.
 
 ## Usage
 
-Every output from the OpenBB Platform Python interface will have the `store` attribute.
+Every output from the OpenBB Platform Python interface - when `obb.user.preferences.output_type = "OBBject"` - will have the `store` attribute.
 
 ### Importing
 
-The class can be initialized with:
+Importing is only necessary when used as a standalone class, and it needs to be initialized. The __init__ will accept a filename or path that can be used to load a previously exported object into memory.
 
 ```python
 from openbb_store.store import Store
@@ -45,6 +40,13 @@ store = Store()
 ```
 
 **Note:** Functionality specific to operating as an OpenBB Platform extension - such as defaults - are not available in this mode.
+
+### Store Class
+
+Within the OpenBB Platform, the extension acts as Global with methods to add, retrieve, and save groups of data objects to memory or file in a transportable and compressed format.
+
+When used as standalone, the `user_data_directory` property (preference) should be set to the desired read/write directory
+upon initialization. Alternatively, specify the complete path to the file when using the IO methods' `filename` parameter.
 
 ### Supported Data Types
 
