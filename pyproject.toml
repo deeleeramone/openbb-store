@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "openbb-store"
-version = "0.1.0"
+version = "0.1.1"
 description = "An OBBject extension for object storage and data interchange."
 authors = ["Danglewood <85772166+deeleeramone@users.noreply.github.com>"]
 readme = "README.md"

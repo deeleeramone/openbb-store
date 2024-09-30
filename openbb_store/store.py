@@ -8,7 +8,6 @@ import lzma
 import os
 import pickletools
 from datetime import datetime
-from functools import lru_cache
 from typing import TYPE_CHECKING, Any, Dict, List, Literal, Optional, Union
 
 import dill as pickle
@@ -261,7 +260,6 @@ class Store(Data):
             return f"Data store '{name}' added successfully."
         return None
 
-    @lru_cache(maxsize=128)
     def get_store(  # noqa: PLR0911
         self,
         name: str = "",
