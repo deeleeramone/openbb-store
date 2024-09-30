@@ -87,7 +87,7 @@ class Store:
     def update_store(
         cls,
         name: str,
-        data: Union[OBBject, "Data", "DataFrame", Dict, List, str],
+        data: Union[OBBject, "Data", "DataFrame", "ExcelFile", Dict, List, str],
         description: Optional[str] = None,
     ):
         """Update a stored data object."""
@@ -100,7 +100,7 @@ class Store:
 
     @classmethod
     def clear_stores(cls):
-        """Clear all stored data objects."""
+        """Clear all stored data objects in memory."""
         return cls._store.clear_stores()
 
     @classmethod

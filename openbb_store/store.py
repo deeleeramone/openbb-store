@@ -1,7 +1,7 @@
 """Store Class."""
 
 # pylint: disable=too-many-branches,too-many-return-statements,too-many-arguments
-# flake8: noqa: UP035, UP006
+# flake8: noqa: UP035, UP006, PLR0915
 
 import hashlib
 import lzma
@@ -20,7 +20,6 @@ if TYPE_CHECKING:
     from pandas import DataFrame, ExcelFile
 
 
-@lru_cache(maxsize=128)
 class Store(Data):
     """The Store class is a data model for storing, organizing, and retrieving OBBjects or other Python objects.
 
@@ -208,7 +207,7 @@ class Store(Data):
             schema = {
                 "length": len(data),  # type: ignore
                 "keys": list(data.keys()),  # type: ignore
-                "types": list(set(v for v in self._extract_types(types_map))),
+                "types": list(set(v for v in self._extract_dict_types(types_map))),
                 "types_map": types_map,  # type: ignore
             }
             schema_repr = str(schema)[:80]
@@ -242,8 +241,10 @@ class Store(Data):
             schema_repr = "sheet_names: " + str(schema.get("sheet_names", ""))[:67]
         else:
             raise ValueError(f"Data type, {data_class}, not supported.")
-
-        schema_repr = schema_repr + "..." if len(schema_repr) >= 80 else schema_repr
+        max_len = 80
+        schema_repr = (
+            schema_repr + "..." if len(schema_repr) >= max_len else schema_repr
+        )
         compressed_schema = self._compress_store(schema)
         self.schemas.update({name: compressed_schema})
         directory_entry = {
@@ -260,6 +261,7 @@ class Store(Data):
             return f"Data store '{name}' added successfully."
         return None
 
+    @lru_cache(maxsize=128)
     def get_store(  # noqa: PLR0911
         self,
         name: str = "",
@@ -592,7 +594,7 @@ class Store(Data):
         types = set()
         for value in types_map.values():
             if isinstance(value, dict):
-                types.update(self._extract_types(value))
+                types.update(self._extract_dict_types(value))
             else:
                 types.add(value)
         return types
@@ -644,13 +646,16 @@ class Store(Data):
                     "headers", {"User-Agent": get_random_agent()}
                 )
                 response = make_request(file, headers=headers)
-                if response.status_code == 403:
-                    while attempts < 5:
+                good_status = 200
+                retry_status = 403
+                max_attempts = 5
+                if response.status_code == retry_status:
+                    while attempts < max_attempts:
                         response = try_again(file)
                         attempts += 1
-                        if response.status_code == 200:
+                        if response.status_code == good_status:
                             break
-                        if attempts == 4:
+                        if attempts == max_attempts - 1:
                             raise RuntimeError(
                                 f"Status Code: {response.status_code}"
                                 + f"\nReason: {response.reason}"
