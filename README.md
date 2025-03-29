@@ -301,7 +301,7 @@ Data store 'sp500_eps' added successfully.
 <pandas.io.excel._base.ExcelFile at 0x1262f62d0>
 ```
 
-ExcelFile objects will have a schema consiting of a list of sheet names.
+ExcelFile objects will have a schema consisting of a list of sheet names.
 
 ```python
 data.store.get_schema("sp500_eps")
