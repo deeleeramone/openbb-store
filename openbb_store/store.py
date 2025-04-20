@@ -8,6 +8,8 @@ import lzma
 import os
 import pickletools
 from datetime import datetime
+from io import BytesIO
+from pathlib import Path
 from typing import TYPE_CHECKING, Any, Dict, List, Literal, Optional, Union
 
 import dill as pickle
@@ -201,6 +203,11 @@ class Store(Data):
         ):
             schema = data.model_copy()  # type: ignore
             schema_repr = schema.__repr__()[:80]  # pylint: disable=C2801
+        elif data_class == "dict" and data.get("type") == "ExcelFile":
+            schema = {
+                "sheet_names": data.get("sheet_names", []),  # type: ignore
+            }
+            schema_repr = "sheet_names: " + str(schema.get("sheet_names", ""))[:67]
         elif data_class == "dict":
             types_map = self._map_dict_types(data)
             schema = {
@@ -233,11 +240,6 @@ class Store(Data):
                 "first_80_chars": data[:80],  # type: ignore
             }
             schema_repr = str(schema)
-        elif data_class == "ExcelFile":
-            schema = {
-                "sheet_names": data.sheet_names,  # type: ignore
-            }
-            schema_repr = "sheet_names: " + str(schema.get("sheet_names", ""))[:67]
         else:
             raise ValueError(f"Data type, {data_class}, not supported.")
         max_len = 80
@@ -372,22 +374,25 @@ class Store(Data):
             return (
                 df.query(pd_query).convert_dtypes() if pd_query else df.convert_dtypes()
             )
-        if data_class == "ExcelFile":
+        if data_class == "dict" and decompressed_data.get("type") == "ExcelFile":
             # pylint: disable=import-outside-toplevel
             from pandas import ExcelFile, read_excel
 
-            file = ExcelFile(decompressed_data)
+            file_bytes = BytesIO(decompressed_data["bytes"])
+            excel_kwargs = decompressed_data.get("excel_kwargs", {})
+            excel_file = ExcelFile(file_bytes, **excel_kwargs)
+
             if sheet_name is not None:
-                if sheet_name not in file.sheet_names:
+                if sheet_name not in excel_file.sheet_names:
                     raise KeyError(
-                        f"Sheet '{sheet_name}' not found in ExcelFile. Choices are: {file.sheet_names}"
+                        f"Sheet '{sheet_name}' not found in ExcelFile. Choices are: {excel_file.sheet_names}"
                     )
                 excel_kwargs = excel_kwargs if excel_kwargs is not None else {}
-                df = read_excel(file, sheet_name, **excel_kwargs)
+                df = read_excel(excel_file, sheet_name, **excel_kwargs)
                 if pd_query:
                     df = df.query(pd_query).convert_dtypes()
                 return df
-            return file
+            return excel_file
 
         return decompressed_data
 
@@ -521,11 +526,17 @@ class Store(Data):
             The ExcelFile object.
         """
         try:
-            excel_file = self._load_from_excel(file, **excel_file_kwargs)
+            excel_file, file_bytes = self._load_from_excel(file, **excel_file_kwargs)
         except Exception as e:
             raise e from e
         try:
-            self.add_store(name=name, data=excel_file, description=description)
+            excel_data = {
+                "type": "ExcelFile",
+                "bytes": file_bytes.getvalue(),
+                "sheet_names": excel_file.sheet_names,
+                "excel_kwargs": excel_file_kwargs,
+            }
+            self.add_store(name=name, data=excel_data, description=description)
         except Exception as e:
             raise e from e
 
@@ -598,7 +609,9 @@ class Store(Data):
         return types
 
     @staticmethod
-    def _load_from_excel(file: Union[bytes, str], **excel_file_kwargs) -> "ExcelFile":
+    def _load_from_excel(
+        file: Union[bytes, str], **excel_file_kwargs
+    ) -> tuple["ExcelFile", BytesIO]:
         """Load an Excel spreadsheet.
 
         Parameters
@@ -615,7 +628,6 @@ class Store(Data):
         """
         try:
             # pylint: disable=import-outside-toplevel, unused-import
-            from io import BytesIO  # noqa
             import openpyxl  # noqa
             import xlrd  # noqa
             from pandas import ExcelFile
@@ -666,29 +678,40 @@ class Store(Data):
                 loaded_file = BytesIO(response.content)
             except Exception as e:
                 raise e from e
-        elif isinstance(file, str) and (
-            file.startswith("/") or file.startswith("Users") or file.startswith("~")
-        ):
-            # pylint: disable=import-outside-toplevel
-            from pathlib import Path
-
+        elif isinstance(file, bytes):
+            loaded_file = BytesIO(file)
+        elif isinstance(file, str):
+            # Handle ANY string path, regardless of prefix
             try:
-                with open(Path(file), "rb") as f:
+                path = Path(file).expanduser().resolve()
+                with open(path, "rb") as f:
                     loaded_file = BytesIO(f.read())
             except FileNotFoundError as e:
                 raise FileNotFoundError(f"File not found: {file}") from e
             except Exception as e:
                 raise e from e
-        elif isinstance(file, bytes):
-            loaded_file = BytesIO(file)
+        elif hasattr(file, "read") and hasattr(file, "seek"):
+            # Handle file-like objects
+            try:
+                content = file.read()
+                file.seek(0)
+                loaded_file = BytesIO(content)
+            except Exception as e:
+                raise e from e
         else:
-            loaded_file = file  # type: ignore
+            raise TypeError(f"Unsupported file type: {type(file)}")
+
+        if loaded_file is None:
+            raise ValueError(f"Could not load file: {file}")
+
         try:
+            file_bytes = BytesIO(loaded_file.getvalue())
+            loaded_file.seek(0)
             excel_file = ExcelFile(loaded_file, **excel_file_kwargs)
         except Exception as e:
             raise e from e
 
-        return excel_file
+        return excel_file, file_bytes
 
     @classmethod
     def _compress_store(cls, data):
