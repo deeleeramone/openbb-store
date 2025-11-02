@@ -3,7 +3,7 @@
 # All options here: https://github.com/charliermarsh/ruff#supported-rules
 
 line-length = 122
-target-version = "py39"
+target-version = "py310"
 fix = true
 
 [lint]

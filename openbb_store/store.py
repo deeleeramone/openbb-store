@@ -1,16 +1,18 @@
 """Store Class."""
 
-# pylint: disable=too-many-branches,too-many-return-statements,too-many-arguments
-# flake8: noqa: UP035, UP006, PLR0915
+# pylint: disable=too-many-branches,too-many-return-statements,too-many-arguments,
+# pylint: disable=too-many-lines,too-many-positional-arguments,too-many-locals,too-many-statements
+# flake8: noqa: PLC0415,PLR0912,PLR0915,PLR0917
 
 import hashlib
+import json
 import lzma
 import os
 import pickletools
 from datetime import datetime
 from io import BytesIO
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Dict, List, Literal, Optional, Union
+from typing import TYPE_CHECKING, Any, Literal
 
 import dill as pickle
 from openbb_core.app.model.obbject import OBBject
@@ -22,7 +24,8 @@ if TYPE_CHECKING:
 
 
 class Store(Data):
-    """The Store class is a data model for storing, organizing, and retrieving OBBjects or other Python objects.
+    """The Store class is a data model for storing,
+    organizing, and retrieving OBBjects or other Python objects.
 
     The class provides methods to add, retrieve, and save groups of data objects
     to memory or file as a transportable, compressed, SHA1 signed pickle.
@@ -96,6 +99,13 @@ class Store(Data):
     ):
         Overwrite an existing stored data object with a new data object.
 
+    append_store(
+        name: str,
+        data: Any,
+        target_key: str | int | None
+    ):
+        Append a new object to an existing store.
+
     remove_store(name: str):
         Remove a stored data object by name.
 
@@ -116,7 +126,7 @@ class Store(Data):
         Clear all stores and load the defaults. Only exists when Store is used as an OBBject extension.
     """
 
-    user_data_directory: Optional[str] = Field(
+    user_data_directory: str = Field(
         description="The read/write directory."
         + " When initialized by OBBject, the parent path is resolved by the OpenBB User Preference, 'data_directory'."
         + " This is overridden by entering the complete path to the file for IO operations.",
@@ -126,26 +136,26 @@ class Store(Data):
         default=True,
         description="Set as False to silence IO operation confirmation messages.",
     )
-    directory: Dict[str, Any] = Field(
+    directory: dict[str, Any] = Field(
         default_factory=dict,
         description="Directory of stored data objects."
         + " Each entry contains a name, description, and a preview of the schema.",
     )
-    archives: Dict[str, Any] = Field(
+    archives: dict[str, Any] = Field(
         default_factory=dict,
         description="Compressed stored data objects.",
     )
-    schemas: Dict[str, Any] = Field(
+    schemas: dict[str, Any] = Field(
         default_factory=dict,
         description="Compressed schema for each stored data object. This field is not meant to be accessed directly."
         + " Use 'directory' to describle all entries,"
         + " or the 'get_schema' method to retrieve the schema for a stored data object.",
     )
 
-    _defaults: List = PrivateAttr(default_factory=list)
+    _defaults: list = PrivateAttr(default_factory=list)
 
     def __init__(
-        self, filename: Optional[str] = None, names: Optional[List[str]] = None, **data
+        self, filename: str | None = None, names: list[str] | str | None = None, **data
     ):
         """Initialize the Store object."""
         super().__init__(**data)
@@ -160,9 +170,9 @@ class Store(Data):
     def add_store(
         self,
         name: str,
-        data: Union[OBBject, Data, "DataFrame", "ExcelFile", Dict, List, str],
-        description: Optional[str] = None,
-    ) -> Union[str, None]:
+        data: "OBBject | Data | DataFrame | ExcelFile | dict | list | str",
+        description: str | None = None,
+    ) -> str | None:
         """Add a stored data object."""
         # pylint: disable=import-outside-toplevel
         if name in self.directory:
@@ -171,7 +181,7 @@ class Store(Data):
                 + " Use 'update_store' to overwrite the existing data."
             )
 
-        data_class = data.__class__.__name__
+        data_class = data.__class__.__name__ or ""
         schema = None
         schema_repr = ""
 
@@ -190,7 +200,7 @@ class Store(Data):
                 ),
                 "created_at": (
                     str(data.extra["metadata"].timestamp)  # type: ignore
-                    if hasattr(data.extra, "metadata")
+                    if hasattr(data.extra, "metadata")  # type: ignore
                     else datetime.now()
                 ),
                 "uid": data.id,  # type: ignore
@@ -203,7 +213,7 @@ class Store(Data):
         ):
             schema = data.model_copy()  # type: ignore
             schema_repr = schema.__repr__()[:80]  # pylint: disable=C2801
-        elif data_class == "dict" and data.get("type") == "ExcelFile":
+        elif data_class == "dict" and data.get("type") == "ExcelFile":  # type: ignore
             schema = {
                 "sheet_names": data.get("sheet_names", []),  # type: ignore
             }
@@ -262,14 +272,14 @@ class Store(Data):
             return f"Data store '{name}' added successfully."
         return None
 
-    def get_store(  # noqa: PLR0911
+    def get_store(  # noqa: PLR0911  # pylint: disable=R0917
         self,
         name: str = "",
         element: Literal["OBBject", "dataframe", "dict", "llm", "chart"] = "dataframe",
-        sheet_name: Optional[str] = None,
-        pd_query: Optional[str] = None,
+        sheet_name: str | None = None,
+        pd_query: str | None = None,
         dict_orient: str = "list",
-        chart_params: Optional[Dict[str, Any]] = None,
+        chart_params: dict[str, Any] | None = None,
         **excel_kwargs,
     ) -> Any:
         """Get a stored data object.
@@ -314,20 +324,23 @@ class Store(Data):
                 # pylint: disable=import-outside-toplevel
                 from openbb_charting.core.openbb_figure import OpenBBFigure  # noqa
 
-                obbject.chart.fig = OpenBBFigure(obbject.chart.fig)
+                obbject.chart.fig = OpenBBFigure(obbject.chart.fig)  # type: ignore
                 # obbject.chart.fig.layout = obbject.chart.content["layout"]
-                obbject.chart.fig.update(
+                obbject.chart.fig.update(  # type: ignore
                     dict(
                         layout={
                             k: v if v is not None else None
-                            for k, v in obbject.chart.content["layout"].items()
+                            for k, v in obbject.chart.content["layout"].items()  # type: ignore
                         },
-                        data=obbject.chart.content["data"],
+                        data=obbject.chart.content["data"],  # type: ignore
                     ),
                     overwrite=False,
                 )
 
-            if element not in ["OBBject", "dataframe", "dict", "llm", "chart"]:
+            if (
+                element not in ["OBBject", "dataframe", "dict", "llm", "chart"]
+                and element not in obbject.accessors
+            ):
                 raise ValueError(
                     f"Invalid element '{element}'. Choose from 'OBBject', 'dataframe', 'dict', 'llm', or 'chart'."
                 )
@@ -336,6 +349,9 @@ class Store(Data):
 
             if element == "llm":
                 return obbject.to_llm()
+
+            if element in obbject.accessors and element != "charting":
+                return getattr(obbject, element)
 
             if element == "chart":
                 msg = "Charting extension is not installed. Install with `pip install openbb-charting`."
@@ -350,7 +366,7 @@ class Store(Data):
                     raise ImportError(msg)
 
                 if hasattr(obbject.chart, "fig") and chart_params is None:
-                    return obbject.charting.fig.show(external=True)
+                    return obbject.charting.fig.show(external=True)  # type: ignore
 
                 chart_params = chart_params if chart_params is not None else {}
                 chart_params["render"] = False
@@ -411,8 +427,8 @@ class Store(Data):
         return decompressed_schema
 
     def save_store_to_file(
-        self, filename, names: Optional[List[str]] = None
-    ) -> Union[str, None]:
+        self, filename, names: list[str] | None = None
+    ) -> str | None:
         """Save the Store object, or a list of store names, to a compressed shelf file."""
         names = names if names is not None else self.list_stores
         if isinstance(names, str):
@@ -447,8 +463,8 @@ class Store(Data):
         return None
 
     def load_store_from_file(
-        self, filename, names: Optional[List[str]] = None
-    ) -> Union[str, None]:
+        self, filename, names: list[str] | str | None = None
+    ) -> str | None:
         """Load the Store object from a file."""
         is_default = filename == "defaults"
         filename = (
@@ -485,7 +501,7 @@ class Store(Data):
         temp = pickle.loads(pickled_data)  # noqa
 
         if names:
-            names = names.split(",")  # type: ignore
+            names = names.split(",") if isinstance(names, str) else names
             for name in temp["directory"].copy():
                 if name not in names:  # type: ignore
                     temp["directory"].pop(name)
@@ -502,9 +518,9 @@ class Store(Data):
 
     def load_from_excel(
         self,
-        file: Union[bytes, str],
+        file: bytes | str,
         name: str,
-        description: Optional[str] = None,
+        description: str | None = None,
         **excel_file_kwargs,
     ) -> "ExcelFile":
         """Load an Excel spreadsheet from a file, adds it as a stored data object, and returns the ExcelFile object.
@@ -548,12 +564,13 @@ class Store(Data):
     def update_store(
         self,
         name: str,
-        data: Union[OBBject, Data, "DataFrame", "ExcelFile", Dict, List, str],
-        description: Optional[str] = None,
-    ) -> Union[str, None]:
+        data: "OBBject | Data | DataFrame | ExcelFile | dict | list | str",
+        description: str | None = None,
+    ) -> str | None:
         """Overwrite an existing stored data object."""
         if name not in self.directory:
             raise KeyError(f"Data store '{name}' does not exist.")
+
         self.remove_store(name)
         self.add_store(
             name=name,
@@ -564,7 +581,317 @@ class Store(Data):
             return f"Data store '{name}' updated successfully."
         return None
 
-    def remove_store(self, name: str) -> Union[str, None]:
+    def append_store(
+        self,
+        name: str,
+        data: Any,
+        target_key: str | int | None = None,
+    ) -> str | None:
+        """Append an object to an existing store.
+
+        Parameters
+        ----------
+        name : str
+            Name of the store to append.
+        data : Any
+            Incoming data to append store with.
+        target_key : str | int | None
+            Target dictionary key, list index number, or ExcelFile sheet name.
+        """
+        if name not in self.directory:
+            raise KeyError(f"Data store '{name}' does not exist.")
+
+        target_store = self.get_store(name)
+        target_info = self.directory.get(name, {})
+
+        if isinstance(target_store, OBBject):
+            raise TypeError("OBBject-type stores do not support append.")
+
+        def _is_index_key(value: Any) -> bool:
+            if isinstance(value, int):
+                return True
+            if isinstance(value, str):
+                try:
+                    int(value)
+                except ValueError:
+                    return False
+                return True
+            return False
+
+        if isinstance(target_store, list):
+            incoming_items = data if isinstance(data, list) else [data]
+
+            list_is_dicts = (
+                all(isinstance(item, dict) for item in target_store)
+                if target_store
+                else all(isinstance(item, dict) for item in incoming_items)
+            )
+            existing_types = (
+                {type(item) for item in target_store if item is not None}
+                if target_store
+                else set()
+            )
+
+            if existing_types and not list_is_dicts:
+                for item in incoming_items:
+                    if not any(isinstance(item, typ) for typ in existing_types):
+                        expected = ", ".join(sorted(t.__name__ for t in existing_types))
+                        raise TypeError(
+                            f"Appending to list stores requires values of type: {expected}."
+                        )
+
+            if list_is_dicts:
+                scalar_candidates = [
+                    item for item in incoming_items if not isinstance(item, dict)
+                ]
+                if scalar_candidates and not (
+                    isinstance(target_key, str) and not _is_index_key(target_key)
+                ):
+                    raise TypeError(
+                        "Scalar updates to a list of dictionaries require a string target_key."
+                    )
+
+            index_key = None
+            if target_key is not None and _is_index_key(target_key):
+                index_key = int(target_key)
+                if not (-len(target_store) <= index_key < len(target_store)):
+                    raise IndexError(
+                        f"Index '{index_key}' is out of range for list of size {len(target_store)}."
+                    )
+                if len(incoming_items) != 1:
+                    raise TypeError(
+                        "Updating a list index requires exactly one incoming value."
+                    )
+                replacement = incoming_items[0]
+                if list_is_dicts and not isinstance(replacement, dict):
+                    raise TypeError(
+                        "List contains dictionaries. Provide a dictionary for index updates."
+                    )
+                if (
+                    existing_types
+                    and not list_is_dicts
+                    and not any(isinstance(replacement, typ) for typ in existing_types)
+                ):
+                    expected = ", ".join(sorted(t.__name__ for t in existing_types))
+                    raise TypeError(
+                        f"Appending to list stores requires values of type: {expected}."
+                    )
+                target_store[index_key] = replacement
+            elif list_is_dicts:
+                scalar_items = [
+                    item for item in incoming_items if not isinstance(item, dict)
+                ]
+                dict_items = [item for item in incoming_items if isinstance(item, dict)]
+
+                if scalar_items:
+                    if not target_store:
+                        raise ValueError(
+                            "Cannot broadcast scalar updates to an empty list of dictionaries."
+                        )
+                    if not all(target_key in entry for entry in target_store):
+                        raise KeyError(
+                            f"Key '{target_key}' not found in all dictionaries."
+                        )
+                    new_value = scalar_items[-1]
+                    for entry in target_store:
+                        entry[target_key] = new_value
+
+                for item in dict_items:
+                    matched = False
+                    if (
+                        isinstance(target_key, str)
+                        and not _is_index_key(target_key)
+                        and target_key in item
+                    ):
+                        for existing in target_store:
+                            if (
+                                target_key in existing
+                                and existing[target_key] == item[target_key]
+                            ):
+                                existing.update(item)
+                                matched = True
+                    if not matched:
+                        for existing in target_store:
+                            if existing == item:
+                                existing.update(item)
+                                matched = True
+                                break
+                    if not matched:
+                        target_store.append(item)
+            else:
+                for item in incoming_items:
+                    if item in target_store:
+                        index = target_store.index(item)
+                        target_store[index] = item
+                    else:
+                        target_store.append(item)
+
+        elif isinstance(target_store, dict):
+            if target_key:
+                target_key = (
+                    str(target_key) if isinstance(target_key, int) else target_key
+                )
+                value = (
+                    data[target_key]
+                    if isinstance(data, dict) and target_key in data
+                    else data
+                )
+                if not self._update_nested_dict(target_store, target_key, value):
+                    raise KeyError(f"No {target_key} found in {target_store}")
+            elif isinstance(data, dict):
+                self._merge_nested_dict(target_store, data)
+            else:
+                raise TypeError("Appending to dict stores requires dict data.")
+
+        elif target_store.__class__.__name__ == "DataFrame":
+            try:
+                # pylint: disable=import-outside-toplevel
+                from pandas import DataFrame, concat
+            except ImportError as exc:
+                raise ImportError(
+                    "Pandas is required to append DataFrame stores."
+                ) from exc
+
+            if not isinstance(data, DataFrame):
+                raise TypeError(
+                    "Appending to DataFrame stores requires DataFrame data."
+                )
+
+            target_df = target_store.copy()
+            incoming_df = data.copy()
+
+            if set(target_df.columns) != set(incoming_df.columns):
+                mismatch = sorted(
+                    set(target_df.columns).symmetric_difference(
+                        set(incoming_df.columns)
+                    )
+                )
+                raise KeyError(
+                    "Incoming DataFrame columns must match existing columns."
+                    + (f" Mismatch: {mismatch}" if mismatch else "")
+                )
+
+            incoming_df = incoming_df[target_df.columns]
+
+            overlap_index = incoming_df.index.intersection(target_df.index)
+            if not overlap_index.empty:
+                target_df.loc[overlap_index] = incoming_df.loc[overlap_index]
+
+            new_rows = incoming_df.loc[~incoming_df.index.isin(target_df.index)]
+            if not new_rows.empty:
+                target_df = concat([target_df, new_rows])
+
+            target_store = target_df
+
+        elif target_store.__class__.__name__ == "ExcelFile":
+            try:
+                # pylint: disable=import-outside-toplevel
+                from pandas import DataFrame, ExcelWriter, concat
+            except ImportError as exc:
+                raise ImportError(
+                    "Pandas is required to append ExcelFile stores."
+                ) from exc
+
+            if not isinstance(data, DataFrame):
+                raise TypeError(
+                    "Appending to ExcelFile stores requires DataFrame data."
+                )
+
+            stored_archive = self.archives.get(name)
+            excel_kwargs: dict[str, Any] = {}
+            if stored_archive is not None:
+                existing_payload = self._decompress_store(stored_archive)
+                if isinstance(existing_payload, dict):
+                    excel_kwargs = existing_payload.get("excel_kwargs", {}) or {}
+
+            sheets = {
+                sheet: target_store.parse(sheet) for sheet in target_store.sheet_names
+            }
+
+            target_sheet = target_key
+            if not target_sheet:
+                base_name = "Sheet"
+                suffix = 1
+                existing_sheet_names = set(sheets)
+                while f"{base_name}{suffix}" in existing_sheet_names:
+                    suffix += 1
+                target_sheet = f"{base_name}{suffix}"
+
+            incoming_df = data.copy()
+
+            if target_sheet in sheets:
+                existing_df = sheets[target_sheet].copy()
+                if set(existing_df.columns) != set(incoming_df.columns):
+                    mismatch = sorted(
+                        set(existing_df.columns).symmetric_difference(
+                            set(incoming_df.columns)
+                        )
+                    )
+                    raise KeyError(
+                        "Incoming DataFrame columns must match existing columns."
+                        + (f" Mismatch: {mismatch}" if mismatch else "")
+                    )
+                incoming_df = incoming_df[existing_df.columns]
+
+                overlap_index = incoming_df.index.intersection(existing_df.index)
+                if not overlap_index.empty:
+                    existing_df.loc[overlap_index] = incoming_df.loc[overlap_index]
+
+                new_rows = incoming_df.loc[~incoming_df.index.isin(existing_df.index)]
+                if not new_rows.empty:
+                    existing_df = concat([existing_df, new_rows])
+
+                sheets[target_sheet] = existing_df
+            else:
+                sheets[target_sheet] = incoming_df
+
+            buffer = BytesIO()
+            with ExcelWriter(buffer, engine="openpyxl") as writer:
+                for sheet_name_out, sheet_df in sheets.items():
+                    sheet_df.to_excel(
+                        writer,
+                        sheet_name=sheet_name_out,
+                        index=False,
+                    )
+
+            target_store = {
+                "type": "ExcelFile",
+                "bytes": buffer.getvalue(),
+                "sheet_names": list(sheets),
+                "excel_kwargs": excel_kwargs,
+            }
+
+        elif isinstance(target_store, str):
+            if not isinstance(data, str):
+                raise TypeError("Appending to string stores requires string data.")
+            try:
+                json.loads(target_store)
+            except (TypeError, json.JSONDecodeError):
+                pass
+            else:
+                raise TypeError("Appending to JSON string stores is not supported.")
+            separator = ""
+            if target_store:
+                separator = "" if target_store.endswith("\n") else "\n"
+            target_store = f"{target_store}{separator}{data}"
+
+        else:
+            raise TypeError(
+                f"Target store object type is not supported.\n\n{target_info}\n"
+            )
+
+        data = target_store
+        self.remove_store(name)
+        self.add_store(
+            name=name,
+            data=data,
+            description=target_info.get("description"),
+        )
+        if self.verbose:
+            return f"{name} appended successfully."
+        return None
+
+    def remove_store(self, name: str) -> str | None:
         """Remove a stored data object by name."""
         if name not in self.directory:
             raise KeyError(f"Data store '{name}' does not exist.")
@@ -575,11 +902,11 @@ class Store(Data):
             return f"Data store '{name}' removed successfully."
         return None
 
-    def clear_stores(self) -> Union[str, None]:
+    def clear_stores(self) -> str | None:
         """Clear all stored data objects from memory."""
-        self.directory: Dict = {}
-        self.archives: Dict = {}
-        self.schemas: Dict = {}
+        self.directory = {}
+        self.archives = {}
+        self.schemas = {}
         if self.verbose:
             return "All data stores cleared."
         return None
@@ -589,7 +916,7 @@ class Store(Data):
 
         def get_types_map(data):
             """Recursively map dictionary types."""
-            types_map: Dict = {}
+            types_map: dict = {}
             for k, v in data.items():
                 if isinstance(v, dict):
                     types_map[k] = get_types_map(v)
@@ -608,9 +935,35 @@ class Store(Data):
                 types.add(value)
         return types
 
+    def _merge_nested_dict(self, target: dict, source: dict) -> None:
+        """Deep-merge source into target."""
+        for key, value in source.items():
+            if (
+                key in target
+                and isinstance(target[key], dict)
+                and isinstance(value, dict)
+            ):
+                self._merge_nested_dict(target[key], value)
+            else:
+                target[key] = value
+
+    def _update_nested_dict(self, target: dict, key: str, value: Any) -> bool:
+        """Recursively update the first matching key inside target."""
+        if key in target:
+            if isinstance(target[key], dict) and isinstance(value, dict):
+                self._merge_nested_dict(target[key], value)
+            else:
+                target[key] = value
+            return True
+        return any(
+            isinstance(child, dict) and self._update_nested_dict(child, key, value)
+            for child in target.values()
+        )
+
     @staticmethod
     def _load_from_excel(
-        file: Union[bytes, str], **excel_file_kwargs
+        file: bytes | str,
+        **excel_file_kwargs,
     ) -> tuple["ExcelFile", BytesIO]:
         """Load an Excel spreadsheet.
 
@@ -681,7 +1034,7 @@ class Store(Data):
         elif isinstance(file, bytes):
             loaded_file = BytesIO(file)
         elif isinstance(file, str):
-            # Handle ANY string path, regardless of prefix
+            # Handle string path
             try:
                 path = Path(file).expanduser().resolve()
                 with open(path, "rb") as f:
@@ -693,8 +1046,8 @@ class Store(Data):
         elif hasattr(file, "read") and hasattr(file, "seek"):
             # Handle file-like objects
             try:
-                content = file.read()
-                file.seek(0)
+                content = file.read()  # type: ignore
+                file.seek(0)  # type: ignore
                 loaded_file = BytesIO(content)
             except Exception as e:
                 raise e from e
@@ -766,7 +1119,7 @@ class Store(Data):
         names = self.list_stores  # type: ignore
         if names == [""]:
             return f"{self.__class__.__name__}\n\nNo archives added."
-        stores: List = []
+        stores: list = []
         for name in names:
             string = (
                 f"\n\n    {name}:\n        Data Class: {self.directory[name]['data_class']}"

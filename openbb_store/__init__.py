@@ -1,9 +1,10 @@
 """OBBject Store Extension."""
 
-# flake8: noqa: UP035, UP006
+# flake8: noqa: PLR0917
+# pylint: disable=R0917
 
 import importlib
-from typing import TYPE_CHECKING, Any, Dict, List, Literal, Optional, Union
+from typing import TYPE_CHECKING, Any, Literal
 from warnings import warn
 
 from openbb_core.app.model.extension import Extension
@@ -29,11 +30,11 @@ class Store:
     def __init__(self, obbject):
         """Initialize the Store extension."""
         _user_settings = getattr(obbject, "_user_settings", None)
-        _data_directory = ""
+        _data_directory: str = ""
         if _user_settings:
             _prefs = getattr(_user_settings, "preferences", None)
             if _prefs:
-                _data_directory = getattr(_prefs, "data_directory", None)
+                _data_directory = getattr(_prefs, "data_directory", "")
         self._store.user_data_directory = _data_directory + "/stores/"
         self.__doc__ = self._store.__doc__
         self._load_defaults()
@@ -77,8 +78,8 @@ class Store:
     def add_store(
         cls,
         name: str,
-        data: Union[OBBject, "Data", "DataFrame", "ExcelFile", Dict, List, str],
-        description: Optional[str] = None,
+        data: "OBBject | Data | DataFrame | ExcelFile | dict | list | str",
+        description: str | None = None,
     ):
         """Add a stored data object."""
         return cls._store.add_store(name, data, description)
@@ -87,11 +88,31 @@ class Store:
     def update_store(
         cls,
         name: str,
-        data: Union[OBBject, "Data", "DataFrame", "ExcelFile", Dict, List, str],
-        description: Optional[str] = None,
+        data: "OBBject | Data | DataFrame | ExcelFile | dict | list | str",
+        description: str | None = None,
     ):
-        """Update a stored data object."""
+        """Overwrite a stored data object."""
         return cls._store.update_store(name, data, description)
+
+    @classmethod
+    def append_store(
+        cls,
+        name: str,
+        data: Any,
+        target_key: str | int | None = None,
+    ) -> str | None:
+        """Append an object to an existing store.
+
+        Parameters
+        ----------
+        name : str
+            Name of the store to append.
+        data : OBBject | Data | DataFrame | ExcelFile | dict | list | str
+            Incoming data to append store with.
+        target_key : str | int | None
+            Target dictionary key, list index number, or ExcelFile sheet name.
+        """
+        return cls._store.append_store(name, data, target_key)
 
     @classmethod
     def remove_store(cls, name: str):
@@ -113,10 +134,10 @@ class Store:
         cls,
         name: str = "",
         element: Literal["OBBject", "dataframe", "dict", "llm", "chart"] = "dataframe",
-        sheet_name: Optional[str] = None,
-        pd_query: Optional[str] = None,
+        sheet_name: str | None = None,
+        pd_query: str | None = None,
         dict_orient: str = "list",
-        chart_params: Optional[Dict[str, Any]] = None,
+        chart_params: dict[str, Any] | None = None,
         **excel_kwargs,
     ) -> Any:
         """Get a stored data object.
@@ -161,7 +182,7 @@ class Store:
     def load_store_from_file(
         cls,
         filename: str,
-        names: Optional[List[str]] = None,
+        names: list[str] | None = None,
     ):
         """Load a Store from a file."""
         return cls._store.load_store_from_file(filename, names)
@@ -169,9 +190,9 @@ class Store:
     @classmethod
     def load_from_excel(
         cls,
-        file: Union[bytes, str],
+        file: bytes | str,
         name: str,
-        description: Optional[str] = None,
+        description: str | None = None,
         **excel_file_kwargs,
     ) -> "ExcelFile":
         """Load an Excel spreadsheet from a file, adds it as a stored data object, and returns the ExcelFile object.
@@ -209,7 +230,7 @@ class Store:
     def save_store_to_file(
         cls,
         filename: str,
-        names: Optional[List[str]] = None,
+        names: list[str] | None = None,
     ):
         """Save a Store to a file."""
         return cls._store.save_store_to_file(filename, names)
@@ -217,7 +238,7 @@ class Store:
     def add_to_defaults(
         self,
         name: str,
-    ) -> Union[str, None]:
+    ) -> str | None:
         """Add a stored data object to load by default."""
         verbose_setting = bool(self.verbose)
         defaults = self.defaults
@@ -245,7 +266,7 @@ class Store:
     def remove_from_defaults(
         self,
         name: str,
-    ) -> Union[str, None]:
+    ) -> str | None:
         """Remove an entry from the default stores."""
         verbose_setting = bool(self.verbose)
         defaults = self.defaults
