@@ -146,6 +146,14 @@ def test_append_nested_dict(store: Store):
     assert updated["level1"]["level2"]["target"] == 42
 
 
+def test_append_dict_list_deduplicates(store: Store):
+    store.add_store("symbols", {"spdrs": ["XLB", "XLC"]})
+    store.append_store("symbols", "XLC", target_key="spdrs")
+    store.append_store("symbols", ["XLC", "XLE"], target_key="spdrs")
+    result = store.get_store("symbols")["spdrs"]
+    assert result == ["XLB", "XLC", "XLE"]
+
+
 def test_append_dataframe_replaces_and_appends(store: Store):
     existing = pd.DataFrame(
         {"id": [1, 2], "value": [10, 20]},

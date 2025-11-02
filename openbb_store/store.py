@@ -950,8 +950,16 @@ class Store(Data):
     def _update_nested_dict(self, target: dict, key: str, value: Any) -> bool:
         """Recursively update the first matching key inside target."""
         if key in target:
-            if isinstance(target[key], dict) and isinstance(value, dict):
-                self._merge_nested_dict(target[key], value)
+            existing = target[key]
+            if isinstance(existing, list):
+                if isinstance(value, list):
+                    for item in value:
+                        if item not in existing:
+                            existing.append(item)
+                elif value not in existing:
+                    existing.append(value)
+            elif isinstance(existing, dict) and isinstance(value, dict):
+                self._merge_nested_dict(existing, value)
             else:
                 target[key] = value
             return True
